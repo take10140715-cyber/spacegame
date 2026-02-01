@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ネオン・サバイバー V20 (STABLE FINAL)</title>
+    <title>ネオン・サバイバー V21 (Sound Edition)</title>
     <style>
         /* === スタイル設定 === */
         body {
@@ -100,12 +100,12 @@
     <div id="joystick-zone">DRAG TO MOVE</div>
 
     <div id="startScreen" class="overlay">
-        <h1>NEON SURVIVOR<br><span style="font-size:24px; color:#00f2fe;">V20 STABLE</span></h1>
+        <h1>NEON SURVIVOR<br><span style="font-size:24px; color:#00f2fe;">V21 SOUND</span></h1>
         <p>
-            [完全安定版]<br>
-            同時ヒット時のフリーズ問題を修正。<br>
-            安全装置により、激しい戦闘でも動作します。<br>
-            迫りくる敵の大群とボスを撃破せよ。
+            [サウンド実装版]<br>
+            迫力のBGMと効果音を追加。<br>
+            敵を倒して経験値を集めよう。<br>
+            時間経過で敵の猛攻が始まる。
         </p>
         <button id="startBtn">SYSTEM START</button>
     </div>
@@ -122,6 +122,134 @@
     </div>
 
     <script>
+        // === サウンドシステム (Web Audio API) ===
+        const Sound = {
+            ctx: null,
+            bgmOscillators: [],
+            bgmInterval: null,
+            isMuted: false,
+
+            init() {
+                if (this.ctx) return;
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioContext();
+            },
+
+            // 汎用トーン生成
+            playTone(freq, type, duration, vol = 0.1, slide = 0) {
+                if (!this.ctx || this.isMuted) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                if(slide !== 0) {
+                    osc.frequency.exponentialRampToValueAtTime(freq + slide, this.ctx.currentTime + duration);
+                }
+                
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            },
+
+            // ノイズ生成（爆発音用）
+            playNoise(duration, vol = 0.2) {
+                if (!this.ctx || this.isMuted) return;
+                const bufferSize = this.ctx.sampleRate * duration;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+                const gain = this.ctx.createGain();
+                
+                // Lowpass filter for explosion muffled sound
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(1000, this.ctx.currentTime);
+                filter.frequency.linearRampToValueAtTime(100, this.ctx.currentTime + duration);
+
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+                noise.start();
+            },
+
+            // 各種SE呼び出し
+            shoot() { this.playTone(400 + Math.random()*200, 'square', 0.1, 0.05, -300); },
+            enemyHit() { this.playTone(150, 'sawtooth', 0.05, 0.05, -50); },
+            explode() { this.playNoise(0.3, 0.2); },
+            gem() { this.playTone(800 + Math.random()*200, 'sine', 0.1, 0.05); },
+            bossWarning() { 
+                this.playTone(100, 'sawtooth', 1.0, 0.3, 50); 
+                setTimeout(() => this.playTone(150, 'sawtooth', 1.0, 0.3, -50), 500);
+            },
+            levelUp() {
+                this.playTone(440, 'triangle', 0.2, 0.2);
+                setTimeout(()=>this.playTone(554, 'triangle', 0.2, 0.2), 100);
+                setTimeout(()=>this.playTone(659, 'triangle', 0.4, 0.2), 200);
+                setTimeout(()=>this.playTone(880, 'triangle', 0.6, 0.2), 300);
+            },
+            damage() { this.playNoise(0.2, 0.3); },
+
+            // BGM (簡易シーケンサー)
+            startBGM() {
+                if (this.bgmInterval || !this.ctx) return;
+                
+                // Cyberpunk Bassline Sequence
+                const notes = [
+                    55, 55, 0, 55,  110, 55, 0, 55, 
+                    55, 55, 0, 55,  110, 55, 0, 65
+                ]; 
+                let beat = 0;
+
+                this.bgmInterval = setInterval(() => {
+                    if(this.ctx.state === 'suspended') this.ctx.resume();
+                    
+                    const note = notes[beat % notes.length];
+                    if (note > 0) {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(note, this.ctx.currentTime);
+                        
+                        // Filter envelope for bass
+                        const filter = this.ctx.createBiquadFilter();
+                        filter.type = 'lowpass';
+                        filter.Q.value = 5;
+                        filter.frequency.setValueAtTime(400, this.ctx.currentTime);
+                        filter.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.15);
+
+                        gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+
+                        osc.connect(filter);
+                        filter.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start();
+                        osc.stop(this.ctx.currentTime + 0.16);
+                    }
+                    beat++;
+                }, 150); // 150ms beat (approx 100 BPM 16th notes)
+            },
+
+            stopBGM() {
+                if (this.bgmInterval) {
+                    clearInterval(this.bgmInterval);
+                    this.bgmInterval = null;
+                }
+            }
+        };
+
         // === コンフィグ ===
         const CONFIG = {
             PLAYER_SPEED: 5,
@@ -130,20 +258,19 @@
             PICKUP_RADIUS: 100,
             
             GUN_RATE: 15,
-            GUN_SPEED: 18,
-            GUN_DAMAGE: 20,
+            GUN_SPEED: 15,
+            GUN_DAMAGE: 15,
 
             XP_BASE: 15, 
             XP_GROWTH: 1.2,
 
             SPAWN_RATE_INIT: 50,
             SPAWN_RATE_MIN: 3,
-            
-            BOSS_INTERVAL: 1200, // 20秒
-            BOSS_HP: 3000,
+            BOSS_INTERVAL: 1200, 
+            BOSS_HP: 1500,
 
-            MAX_ENEMIES: 150,
-            MAX_PARTICLES: 80,
+            MAX_ENEMIES: 100,
+            MAX_PARTICLES: 100,
             SCREEN_PADDING: 30 
         };
 
@@ -250,7 +377,10 @@
 
                 if (this.stats.shield > 0 && !this.stats.shieldActive) {
                     if (this.stats.shieldCool > 0) this.stats.shieldCool--;
-                    else this.stats.shieldActive = true;
+                    else {
+                        this.stats.shieldActive = true;
+                        Sound.playTone(600, 'sine', 0.5, 0.1); // シールド回復音
+                    }
                 }
 
                 this.attack();
@@ -261,7 +391,7 @@
                 if (frameCount - this.timers.shot >= this.stats.rate) {
                     let target = getNearestEnemy(this.x, this.y);
                     let angle = target ? Math.atan2(target.y - this.y, target.x - this.x) : this.angle;
-                    const spread = 0.15;
+                    const spread = 0.2;
                     const startAngle = angle - (spread * (this.stats.count - 1)) / 2;
 
                     for (let i = 0; i < this.stats.count; i++) {
@@ -274,6 +404,7 @@
                         }
                     }
                     this.timers.shot = frameCount;
+                    Sound.shoot();
                 }
 
                 // ミサイル
@@ -286,12 +417,14 @@
                         });
                     }
                     this.timers.missile = frameCount;
+                    Sound.playTone(300, 'sawtooth', 0.2, 0.1, -100);
                 }
 
                 // サンダー
                 if (this.stats.lightning > 0 && frameCount - this.timers.lightning >= 90) {
                     const targets = enemies.filter(e => e.x > 0 && e.x < canvas.width && e.y > 0 && e.y < canvas.height);
                     if (targets.length > 0) {
+                        Sound.playTone(100, 'square', 0.1, 0.2, 800); // サンダー音
                         for(let i=0; i<this.stats.lightning; i++) {
                             const t = targets[Math.floor(Math.random() * targets.length)];
                             if (t) {
@@ -326,6 +459,7 @@
                             dmg: this.stats.damage * 3, pierce: 999, life: 30, type: 'LASER', hitList: []
                         });
                         this.timers.laser = frameCount;
+                        Sound.playTone(200, 'sawtooth', 0.5, 0.3, 500); // レーザー音
                     }
                 }
             }
@@ -384,6 +518,7 @@
                     this.stats.shieldCool = 300;
                     this.invincible = 30;
                     addText(this.x, this.y, "BLOCK!", '#0ff');
+                    Sound.playTone(200, 'square', 0.2, 0.3, -100); // シールド破損音
                     return;
                 }
 
@@ -391,15 +526,16 @@
                 this.invincible = CONFIG.INVINCIBLE_TIME;
                 updateHud();
                 shake(20);
+                Sound.damage();
                 
-                // ★修正: ボム効果 (配列を書き換えずにHPを0にする安全処理)
-                enemies.forEach(e => {
+                enemies = enemies.filter(e => {
                     if (getDist(this.x, this.y, e.x, e.y) < 300) {
                         e.damage(9999);
                         addParticle(e.x, e.y, 5, '#f00');
                     }
+                    return true;
                 });
-                // 弾の消去も安全に
+                
                 enemyBullets.forEach(b => b.life = 0);
 
                 if (this.lives <= 0) gameOver();
@@ -420,9 +556,8 @@
         class Enemy {
             constructor(isBoss) {
                 this.isBoss = isBoss;
-                this.dead = false; // ★生存フラグ管理
+                this.dead = false;
                 
-                // スポーン位置：画面外かつプレイヤーから離れた位置
                 let angle, dist;
                 for(let i=0; i<10; i++) {
                     angle = Math.random() * Math.PI * 2;
@@ -466,6 +601,7 @@
 
                 if (this.isBoss && frameCount % 90 === 0) { 
                     const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                    Sound.playTone(200, 'square', 0.1, 0.1, -50); // ボス発射音
                     for(let i=-1; i<=1; i++) {
                         enemyBullets.push({
                             x: this.x, y: this.y,
@@ -492,7 +628,7 @@
                 this.hp -= amount;
                 addText(this.x, this.y - 20, Math.floor(amount), '#fff');
                 if (this.hp <= 0) {
-                    this.dead = true; // ★フラグを立てて、後で安全に削除
+                    this.dead = true; 
                     score += this.isBoss ? 1000 : 10;
                     
                     if (this.isBoss) {
@@ -504,6 +640,7 @@
                     }
                     
                     addParticle(this.x, this.y, 5, this.color);
+                    Sound.explode();
                     
                     if (this.isBoss) {
                         isBossActive = false;
@@ -514,6 +651,7 @@
                     }
                     return true;
                 }
+                Sound.enemyHit();
                 return false;
             }
         }
@@ -535,7 +673,7 @@
         function getNearestEnemy(x, y) {
             let nearest = null; let minDist = Infinity;
             enemies.forEach(e => {
-                if (e.dead) return; // 死んだ敵は無視
+                if (e.dead) return; 
                 let d = getDist(x, y, e.x, e.y);
                 if (d < minDist) { minDist = d; nearest = e; }
             });
@@ -569,6 +707,9 @@
         // === メインループ ===
 
         function init() {
+            Sound.init();
+            Sound.startBGM();
+            
             player = new Player();
             enemies = []; bullets = []; enemyBullets = []; gems = []; particles = []; texts = [];
             score = 0; frameCount = 0; bossKillCount = 0;
@@ -603,7 +744,7 @@
                 if (frameCount % rate === 0) enemies.push(new Enemy(false));
             }
 
-            // フェイルセーフ: ボス消失対策
+            // フェイルセーフ
             const bossExists = enemies.some(e => e.isBoss && !e.dead);
             if (isBossActive && !bossExists) {
                 isBossActive = false;
@@ -615,6 +756,7 @@
                 if (nextBossTimer <= 0) {
                     isBossActive = true;
                     enemies.push(new Enemy(true));
+                    Sound.bossWarning();
                     const w = document.getElementById('boss-warning');
                     w.style.display = 'block'; setTimeout(() => w.style.display = 'none', 3000);
                 }
@@ -623,7 +765,7 @@
             // 敵処理
             for (let i = enemies.length - 1; i >= 0; i--) {
                 let e = enemies[i];
-                if (e.dead) { // ★安全な削除
+                if (e.dead) { 
                     enemies.splice(i, 1);
                     continue;
                 }
@@ -651,15 +793,13 @@
 
                 for (let j = enemies.length - 1; j >= 0; j--) {
                     let e = enemies[j];
-                    if (e.dead) continue; // 死体に当てない
+                    if (e.dead) continue;
                     if (getDist(b.x, b.y, e.x, e.y) < e.size + 10) {
                         if (!b.hitList.includes(j)) {
-                            // ★e.damage()内でe.deadフラグが立つだけで、配列からはまだ消えない
-                            let isDead = e.damage(b.dmg);
+                            e.damage(b.dmg);
                             b.hitList.push(j);
                             addParticle(b.x, b.y, 2, '#ff0');
                             
-                            // 貫通処理
                             if (b.pierce <= 0) { bullets.splice(i, 1); break; }
                             else b.pierce--;
                         }
@@ -667,14 +807,13 @@
                 }
             }
 
-            // 敵弾処理 (安全版)
+            // 敵弾処理
             for (let i = enemyBullets.length - 1; i >= 0; i--) {
                 let b = enemyBullets[i];
                 if (!b) continue;
                 b.x += b.vx; b.y += b.vy; b.life--;
                 
-                // ボスの弾を大きく
-                ctx.fillStyle = '#f00'; ctx.fillRect(b.x - 5, b.y - 5, 10, 10);
+                ctx.fillStyle = '#f00'; ctx.fillRect(b.x - 4, b.y - 4, 8, 8);
 
                 if (getDist(b.x, b.y, player.x, player.y) < 12) {
                     player.hit();
@@ -691,7 +830,12 @@
                 if (dist < pickup) {
                     g.x += (player.x - g.x) / dist * 12; g.y += (player.y - g.y) / dist * 12;
                 }
-                if (dist < 20) { player.gainXp(g.val); gems.splice(i, 1); continue; }
+                if (dist < 20) { 
+                    player.gainXp(g.val); 
+                    Sound.gem();
+                    gems.splice(i, 1); 
+                    continue; 
+                }
                 drawNeonRect(ctx, g.x, g.y, 8, 8, '#0f0');
             }
 
@@ -745,6 +889,7 @@
 
         function levelUp() {
             gameState = 'LEVEL_UP';
+            Sound.levelUp();
             const container = document.getElementById('cardsContainer');
             container.innerHTML = '';
             document.getElementById('levelUpScreen').classList.remove('hidden');
@@ -768,6 +913,7 @@
                 div.innerHTML = `<div class="card-icon">${u.icon}</div><div class="card-title">${u.title}</div><div class="card-desc">${u.desc}</div>`;
                 div.onclick = () => {
                     u.apply();
+                    Sound.playTone(600, 'sine', 0.1);
                     document.getElementById('levelUpScreen').classList.add('hidden');
                     gameState = 'PLAYING';
                     player.invincible = 60;
@@ -779,6 +925,8 @@
 
         function gameOver() {
             gameState = 'GAME_OVER';
+            Sound.stopBGM();
+            Sound.playTone(100, 'sawtooth', 1.0, 0.5, -50); // Game Over Sound
             document.getElementById('finalScore').textContent = `SCORE: ${score}`;
             document.getElementById('gameOverScreen').classList.remove('hidden');
         }
@@ -788,6 +936,7 @@
         window.addEventListener('keyup', e => keys[e.key] = false);
 
         window.addEventListener('touchstart', e => {
+            if (gameState === 'MENU' || gameState === 'GAME_OVER') return;
             input.active = true;
             input.startX = e.touches[0].clientX;
             input.startY = e.touches[0].clientY;
@@ -816,4 +965,3 @@
     </script>
 </body>
 </html>
-
