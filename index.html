@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>POP STAR V30 (Mobile Fix)</title>
+    <title>POP STAR V30 (Speed Fix)</title>
     <!-- p5.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
     <!-- Tone.js (音楽生成用) -->
@@ -132,9 +132,9 @@
         <div id="startScreen" class="overlay-screen">
             <h1>POP STAR<br>SURVIVOR</h1>
             <p>
-                [V30 Mobile Fix]<br>
-                スマホ操作の不具合を修正しました。<br>
-                画面長押しによる選択を防ぎます。<br>
+                [V30 Speed Fix]<br>
+                スマホ移動速度の制限バグを修正。<br>
+                自機の性能に応じた速度で移動します。<br>
                 アイテム25種類 & サウンド搭載！
             </p>
             <button id="startBtn">START!</button>
@@ -159,7 +159,7 @@
         const CONFIG = {
             MAX_LIVES: 3,
             PLAYER_SPEED: 4.5,
-            TOUCH_SENSITIVITY: 1.0,
+            TOUCH_SENSITIVITY: 1.5, // 感度を少し上げて操作しやすく
             INVINCIBLE_TIME: 120,
             PICKUP_RADIUS: 120,
             BOSS_INTERVAL: 1800, 
@@ -334,12 +334,10 @@
                 document.getElementById('joystick-zone').style.display = 'block';
             }
             
-            // === 修正点: コンテキストメニュー(右クリック/長押しメニュー)を無効化 ===
-            // これにより、スマホで長押しした際のメニュー表示を防ぐ
+            // === コンテキストメニュー(右クリック/長押しメニュー)を無効化 ===
             document.addEventListener('contextmenu', event => event.preventDefault());
 
-            // === 修正点: body全体へのタッチイベントを制御し、スクロール等を防ぐ ===
-            // { passive: false } を指定することで preventDefault() が効くようにする
+            // === body全体へのタッチイベントを制御し、スクロール等を防ぐ ===
             document.body.addEventListener('touchmove', function(e) { 
                 e.preventDefault(); 
             }, { passive: false });
@@ -524,14 +522,28 @@
                 if (keyIsDown(65) || keyIsDown(LEFT_ARROW)) dx = -1;
                 if (keyIsDown(68) || keyIsDown(RIGHT_ARROW)) dx = 1;
                 
+                // === 修正点：タッチ操作時の移動量制限 ===
+                // 以前は tdx, tdy を直接加算していたため、指の速さ＝キャラの速さになっていた。
+                // これを修正し、移動ベクトルを作成後、プレイヤーのステータス(this.stats.speed)に制限する。
                 if (touches.length > 0) {
                     let t = touches[0];
                     if (!isTouching) {
                         prevTouchX = t.x; prevTouchY = t.y; isTouching = true;
                     } else {
-                        let tdx = t.x - prevTouchX; let tdy = t.y - prevTouchY;
-                        this.pos.x += tdx * CONFIG.TOUCH_SENSITIVITY;
-                        this.pos.y += tdy * CONFIG.TOUCH_SENSITIVITY;
+                        let tdx = t.x - prevTouchX;
+                        let tdy = t.y - prevTouchY;
+                        
+                        // 移動ベクトルを作成し感度を適用
+                        let touchMove = createVector(tdx, tdy);
+                        touchMove.mult(CONFIG.TOUCH_SENSITIVITY);
+
+                        // 速度制限: 移動量がステータスのスピードを超えないように制限
+                        if (touchMove.mag() > this.stats.speed) {
+                            touchMove.setMag(this.stats.speed);
+                        }
+
+                        this.pos.add(touchMove);
+                        
                         if(tdx > 1) this.faceDir = 1; if(tdx < -1) this.faceDir = -1;
                         prevTouchX = t.x; prevTouchY = t.y;
                     }
