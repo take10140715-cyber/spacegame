@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>POP STAR V27 (Fixed)</title>
+    <title>POP STAR V28 (Touch Optimized)</title>
     <!-- p5.js ライブラリ -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
     <style>
@@ -13,8 +13,16 @@
             overflow: hidden;
             font-family: 'Verdana', sans-serif;
             color: white;
+            
+            /* --- タッチ操作対策: 選択・長押しメニューを無効化 --- */
             user-select: none;
-            touch-action: none;
+            -webkit-user-select: none; /* Safari/Chrome */
+            -moz-user-select: none;    /* Firefox */
+            -ms-user-select: none;     /* IE/Edge */
+            
+            touch-action: none;        /* ブラウザのスクロール・ズーム無効 */
+            -webkit-touch-callout: none; /* iOS長押しメニュー無効 */
+            -webkit-tap-highlight-color: transparent; /* タップ時のハイライト無効 */
         }
 
         /* キャンバスを背景に固定 */
@@ -23,6 +31,7 @@
             position: fixed;
             top: 0; left: 0;
             z-index: 0;
+            touch-action: none;
         }
 
         /* UIレイヤー */
@@ -47,9 +56,10 @@
         h1 {
             font-size: 48px; margin: 0 0 20px 0; color: #ff99cc;
             text-shadow: 4px 4px 0 #fff; text-align: center;
+            pointer-events: none; /* 文字選択防止 */
         }
 
-        p { font-size: 16px; color: #eee; text-align: center; line-height: 1.8; margin-bottom: 30px; }
+        p { font-size: 16px; color: #eee; text-align: center; line-height: 1.8; margin-bottom: 30px; pointer-events: none; }
 
         button {
             background: #ff6699; border: 4px solid #fff;
@@ -58,21 +68,22 @@
             box-shadow: 0 6px 0 #cc4477;
             transition: transform 0.1s; pointer-events: auto;
             touch-action: manipulation;
+            user-select: none; -webkit-user-select: none;
         }
         button:active { transform: translateY(6px); box-shadow: 0 0 0 #cc4477; }
 
-        #hud { position: absolute; top: 20px; left: 20px; text-align: left; }
+        #hud { position: absolute; top: 20px; left: 20px; text-align: left; pointer-events: none; }
         .hud-text { font-size: 22px; font-weight: bold; margin-bottom: 5px; text-shadow: 2px 2px 0 #ff6699; }
         
         #xp-bar-container {
             position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
             width: 300px; height: 14px; background: rgba(0,0,0,0.5);
-            border: 3px solid #fff; border-radius: 10px; overflow: hidden;
+            border: 3px solid #fff; border-radius: 10px; overflow: hidden; pointer-events: none;
         }
         #xp-bar-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #ffcc00, #ff6699); transition: width 0.2s; }
         #level-badge {
             position: absolute; top: 40px; left: 50%; transform: translateX(-50%);
-            font-size: 18px; font-weight: bold; color: #fff; text-shadow: 2px 2px 0 #000;
+            font-size: 18px; font-weight: bold; color: #fff; text-shadow: 2px 2px 0 #000; pointer-events: none;
         }
 
         .card-container { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; max-width: 800px; pointer-events: none; }
@@ -81,17 +92,18 @@
             padding: 15px; width: 140px; color: #333;
             cursor: pointer; pointer-events: auto; text-align: center;
             box-shadow: 0 6px 0 #cc9900; transition: transform 0.1s;
+            user-select: none; -webkit-user-select: none;
         }
         .upgrade-card:active { transform: translateY(6px); box-shadow: 0 0 0 #cc9900; }
-        .card-icon { font-size: 40px; margin-bottom: 5px; }
-        .card-title { font-size: 14px; font-weight: bold; color: #ff6699; margin-bottom: 5px; }
-        .card-desc { font-size: 11px; color: #555; line-height: 1.2; }
+        .card-icon { font-size: 40px; margin-bottom: 5px; pointer-events: none; }
+        .card-title { font-size: 14px; font-weight: bold; color: #ff6699; margin-bottom: 5px; pointer-events: none; }
+        .card-desc { font-size: 11px; color: #555; line-height: 1.2; pointer-events: none; }
 
         #boss-warning {
             position: absolute; top: 40%; left: 0; width: 100%;
             text-align: center; font-size: 60px; font-weight: 900; color: #ff3366;
             text-shadow: 4px 4px 0 #fff; display: none; z-index: 5;
-            animation: bounce 0.5s infinite alternate;
+            animation: bounce 0.5s infinite alternate; pointer-events: none;
         }
         @keyframes bounce { from { transform: scale(1); } to { transform: scale(1.1); } }
 
@@ -118,9 +130,9 @@
         <div id="startScreen" class="overlay-screen">
             <h1>POP STAR<br>SURVIVOR</h1>
             <p>
-                [V27 FIXED]<br>
-                エラー修正済み。<br>
-                指になめらかに追従するダイレクト操作。<br>
+                [タッチ最適化版]<br>
+                長押しによる選択を防ぎました。<br>
+                画面をなぞって自機を操作！<br>
                 スタートボタンで開始！
             </p>
             <button id="startBtn">START!</button>
@@ -153,7 +165,7 @@
             XP_GROWTH: 1.2
         };
 
-        // === 2. グローバル変数 (初期値null) ===
+        // === 2. グローバル変数 ===
         let player = null;
         let enemies = [];
         let bullets = [];
@@ -175,13 +187,12 @@
         let prevTouchY = 0;
         let isTouching = false;
 
-        // === 3. クラス定義 (最優先で読み込み) ===
+        // === 3. クラス定義 ===
 
         class Player {
             constructor() {
-                // 安全策：画面サイズが未確定ならとりあえず(300,300)
-                let w = typeof width !== 'undefined' ? width : 300;
-                let h = typeof height !== 'undefined' ? height : 300;
+                let w = typeof width !== 'undefined' ? width : window.innerWidth;
+                let h = typeof height !== 'undefined' ? height : window.innerHeight;
                 this.pos = createVector(w/2, h/2);
                 this.lives = CONFIG.MAX_LIVES;
                 this.invincible = 0;
@@ -240,8 +251,11 @@
                     if(dx < 0) this.faceDir = -1;
                 }
 
-                this.pos.x = constrain(this.pos.x, 25, width-25);
-                this.pos.y = constrain(this.pos.y, 25, height-25);
+                // 画面端制限
+                if(typeof width !== 'undefined') {
+                    this.pos.x = constrain(this.pos.x, 25, width-25);
+                    this.pos.y = constrain(this.pos.y, 25, height-25);
+                }
 
                 if (this.invincible > 0) this.invincible--;
                 this.animAngle += 0.05;
@@ -288,11 +302,7 @@
                 noStroke();
                 
                 // Star
-                push(); 
-                rotate(this.animAngle); 
-                // ★修正箇所: drawStarに色を渡す
-                drawStar(0, 0, 18, 35, 5, color(50, 80, 100)); 
-                pop();
+                push(); rotate(this.animAngle); drawStar(0, 0, 18, 35, 5, color(50, 80, 100)); pop();
 
                 // Character
                 fill(320, 60, 90); ellipse(0, -10, 20, 25);
@@ -358,7 +368,7 @@
                 this.dead = false;
                 
                 let ang = random(TWO_PI);
-                let d = (width > height ? width : height) / 1.5 + 100;
+                let d = (typeof width !== 'undefined' ? (width > height ? width : height) : 1000) / 1.5 + 100;
                 this.pos = createVector(player.pos.x + cos(ang)*d, player.pos.y + sin(ang)*d);
                 this.vel = createVector(0,0);
                 this.anim = random(100);
@@ -551,10 +561,8 @@
             }
         }
 
-        // Draw Star Helper with explicit color arg
         function drawStar(x, y, r1, r2, n, col) {
-            if(col) fill(col); 
-            noStroke();
+            fill(col); noStroke();
             let angle = TWO_PI / n; let halfAngle = angle/2.0;
             beginShape();
             for (let a = 0; a < TWO_PI; a += angle) {
@@ -573,11 +581,14 @@
             colorMode(HSB, 360, 100, 100, 100);
             smooth();
 
+            // モバイル対策
             if ('ontouchstart' in window) {
                 document.getElementById('joystick-zone').style.display = 'block';
             }
             
-            // 初回初期化
+            // 重要：右クリック・長押しメニュー禁止
+            document.addEventListener('contextmenu', event => event.preventDefault());
+            
             resetGameParams();
         }
 
@@ -586,7 +597,23 @@
         }
 
         function resetGameParams() {
-            player = new Player();
+            // Player初期化（画面サイズが確定してから）
+            let w = typeof width !== 'undefined' ? width : window.innerWidth;
+            let h = typeof height !== 'undefined' ? height : window.innerHeight;
+            
+            if(!player) player = new Player();
+            player.pos = createVector(w/2, h/2);
+            player.lives = CONFIG.MAX_LIVES;
+            player.xp = 0;
+            player.level = 1;
+            player.nextXp = 20;
+            player.stats.count = 1;
+            player.stats.dmg = 10;
+            player.stats.rate = 15;
+            player.stats.missile = 0;
+            player.stats.shield = 0;
+            player.stats.shieldActive = false;
+            
             enemies = []; bullets = []; enemyBullets = []; particles = []; gems = []; texts = [];
             score = 0; frameCnt = 0; bossKillCount = 0;
             nextBossTimer = CONFIG.BOSS_INTERVAL;
@@ -594,28 +621,41 @@
             updateHud();
         }
 
-        function startGame() {
-            document.getElementById('startScreen').classList.add('hidden');
-            resetGameParams();
-            gameState = "PLAYING";
-        }
-
-        function resetGame() {
-            document.getElementById('gameOverScreen').classList.add('hidden');
-            resetGameParams();
-            gameState = "PLAYING";
-        }
-
         // イベントリスナー
         document.addEventListener('DOMContentLoaded', () => {
             const startBtn = document.getElementById('startBtn');
             const restartBtn = document.getElementById('restartBtn');
 
-            startBtn.addEventListener('click', startGame);
-            startBtn.addEventListener('touchend', (e) => { e.preventDefault(); startGame(); });
+            // タッチとクリックの両方で反応するようにする
+            const startGameHandler = (e) => {
+                // ボタン以外への伝播を止める
+                e.preventDefault(); 
+                e.stopPropagation();
+                document.getElementById('startScreen').classList.add('hidden');
+                resetGameParams();
+                gameState = "PLAYING";
+            };
 
-            restartBtn.addEventListener('click', resetGame);
-            restartBtn.addEventListener('touchend', (e) => { e.preventDefault(); resetGame(); });
+            const resetGameHandler = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                document.getElementById('gameOverScreen').classList.add('hidden');
+                resetGameParams();
+                gameState = "PLAYING";
+            };
+
+            startBtn.addEventListener('click', startGameHandler);
+            startBtn.addEventListener('touchend', startGameHandler);
+
+            restartBtn.addEventListener('click', resetGameHandler);
+            restartBtn.addEventListener('touchend', resetGameHandler);
+            
+            // 画面全体の長押し防止（ボタン以外）
+            window.addEventListener('touchstart', function(e) {
+                if(e.target.tagName !== 'BUTTON' && e.target.closest('.upgrade-card') === null) {
+                    e.preventDefault();
+                }
+            }, {passive: false});
         });
 
         // === 5. メインループ ===
@@ -642,7 +682,7 @@
                     ellipse(x, y, size, size);
                 }
 
-                // エラーガード付き更新
+                // 安全装置：playerが存在する場合のみ更新
                 if(player) {
                     updateGameLogic();
                 }
@@ -665,12 +705,8 @@
                 nextBossTimer--;
                 if (nextBossTimer <= 0) spawnBoss();
             } else {
-                // 安全装置: ボスがいないのにフラグが立っていたらリセット
-                let hasBoss = false;
-                for(let e of enemies) if(e.isBoss) hasBoss = true;
-                if(!hasBoss) {
-                    isBossActive = false;
-                    nextBossTimer = 100;
+                if (!enemies.some(e => e.isBoss)) {
+                    isBossActive = false; nextBossTimer = 100;
                 }
             }
 
@@ -737,12 +773,19 @@
                 const div = document.createElement('div');
                 div.className = `upgrade-card ${u.rare?'card-rare':''}`;
                 div.innerHTML = `<div class="card-icon">${u.icon}</div><div class="card-title">${u.title}</div><div class="card-desc">${u.desc}</div>`;
-                div.onclick = () => {
+                
+                // カードクリック・タッチ処理
+                const selectUpgrade = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     u.apply();
                     document.getElementById('levelUpScreen').classList.add('hidden');
                     gameState = "PLAYING";
                     player.invincible = 60;
                 };
+                div.addEventListener('click', selectUpgrade);
+                div.addEventListener('touchend', selectUpgrade);
+                
                 c.appendChild(div);
             });
         }
