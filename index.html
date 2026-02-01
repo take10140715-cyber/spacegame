@@ -3,21 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>POP STAR V30 (Fixed V3)</title>
+    <title>POP STAR V30 (Mobile Fix)</title>
     <!-- p5.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
     <!-- Tone.js (音楽生成用) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
+        /* === 修正点: 全要素に対してタッチ操作のデフォルト挙動を無効化 === */
+        * {
+            box-sizing: border-box;
+            touch-action: none;       /* スクロールやズームを無効化 */
+            user-select: none;        /* テキスト選択を無効化 */
+            -webkit-user-select: none; /* Safari用 */
+            -webkit-touch-callout: none; /* 長押しメニューを無効化(iOS) */
+        }
+
         body {
             margin: 0; padding: 0;
             background-color: #2b1d3d;
             overflow: hidden;
             font-family: 'Verdana', sans-serif;
             color: white;
+            /* bodyにも念のため適用 */
             user-select: none;
             touch-action: none;
             -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: rgba(0,0,0,0); /* タップ時のハイライトを消す */
         }
 
         canvas { display: block; position: fixed; top: 0; left: 0; z-index: 0; }
@@ -121,9 +132,9 @@
         <div id="startScreen" class="overlay-screen">
             <h1>POP STAR<br>SURVIVOR</h1>
             <p>
-                [V30 修正版V3]<br>
-                サウンドエラーを修正しました。<br>
-                スタートボタンを押せば即座に始まります。<br>
+                [V30 Mobile Fix]<br>
+                スマホ操作の不具合を修正しました。<br>
+                画面長押しによる選択を防ぎます。<br>
                 アイテム25種類 & サウンド搭載！
             </p>
             <button id="startBtn">START!</button>
@@ -233,7 +244,6 @@
 
                 this.loop = new Tone.Loop(time => {
                     if(this.muted) return;
-                    // BGM logic handles timing internally, less prone to the specific error but wrapped just in case
                     try {
                         if(index % 4 === 0) this.kick.triggerAttackRelease("C1", "8n", time);
                         if(index % 2 === 0) this.hat.triggerAttackRelease("32n", time);
@@ -260,7 +270,6 @@
                 document.getElementById('mute-btn').innerText = this.muted ? "🔇" : "🔊";
             },
 
-            // --- 修正箇所: サウンド再生関数に try-catch と Tone.now() の明示的指定を追加 ---
             shoot() { 
                 if(!this.muted && this.ready) {
                     try { this.lead.triggerAttackRelease("C6", "32n", Tone.now(), 0.3); } catch(e){}
@@ -268,7 +277,6 @@
             },
             hit() { 
                 if(!this.muted && this.ready) {
-                    // ここがエラーの原因箇所。try-catchで囲み、現在時刻を明示
                     try { this.hat.triggerAttackRelease("16n", Tone.now(), 0.5); } catch(e){} 
                 } 
             },
@@ -326,6 +334,16 @@
                 document.getElementById('joystick-zone').style.display = 'block';
             }
             
+            // === 修正点: コンテキストメニュー(右クリック/長押しメニュー)を無効化 ===
+            // これにより、スマホで長押しした際のメニュー表示を防ぐ
+            document.addEventListener('contextmenu', event => event.preventDefault());
+
+            // === 修正点: body全体へのタッチイベントを制御し、スクロール等を防ぐ ===
+            // { passive: false } を指定することで preventDefault() が効くようにする
+            document.body.addEventListener('touchmove', function(e) { 
+                e.preventDefault(); 
+            }, { passive: false });
+
             player = new Player(windowWidth/2, windowHeight/2);
             resetGameParams();
 
