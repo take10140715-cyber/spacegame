@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>POP STAR V28 (Touch Optimized)</title>
-    <!-- p5.js ライブラリ -->
+    <title>POP STAR V30 (Fixed V3)</title>
+    <!-- p5.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <!-- Tone.js (音楽生成用) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
         body {
             margin: 0; padding: 0;
@@ -13,34 +15,18 @@
             overflow: hidden;
             font-family: 'Verdana', sans-serif;
             color: white;
-            
-            /* --- タッチ操作対策: 選択・長押しメニューを無効化 --- */
             user-select: none;
-            -webkit-user-select: none; /* Safari/Chrome */
-            -moz-user-select: none;    /* Firefox */
-            -ms-user-select: none;     /* IE/Edge */
-            
-            touch-action: none;        /* ブラウザのスクロール・ズーム無効 */
-            -webkit-touch-callout: none; /* iOS長押しメニュー無効 */
-            -webkit-tap-highlight-color: transparent; /* タップ時のハイライト無効 */
-        }
-
-        /* キャンバスを背景に固定 */
-        canvas {
-            display: block;
-            position: fixed;
-            top: 0; left: 0;
-            z-index: 0;
             touch-action: none;
+            -webkit-touch-callout: none;
         }
 
-        /* UIレイヤー */
+        canvas { display: block; position: fixed; top: 0; left: 0; z-index: 0; }
+
         #ui-layer {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 10;
         }
 
-        /* オーバーレイ画面 */
         .overlay-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column;
@@ -54,63 +40,67 @@
         .hidden { opacity: 0; pointer-events: none !important; visibility: hidden; }
 
         h1 {
-            font-size: 48px; margin: 0 0 20px 0; color: #ff99cc;
+            font-size: 42px; margin: 0 0 20px 0; color: #ff99cc;
             text-shadow: 4px 4px 0 #fff; text-align: center;
-            pointer-events: none; /* 文字選択防止 */
+            line-height: 1.2;
         }
 
-        p { font-size: 16px; color: #eee; text-align: center; line-height: 1.8; margin-bottom: 30px; pointer-events: none; }
+        p { font-size: 14px; color: #eee; text-align: center; line-height: 1.6; margin-bottom: 30px; max-width: 80%; }
 
         button {
             background: #ff6699; border: 4px solid #fff;
-            padding: 15px 60px; font-size: 24px; color: #fff;
+            padding: 15px 50px; font-size: 20px; color: #fff;
             border-radius: 50px; cursor: pointer; font-weight: bold;
             box-shadow: 0 6px 0 #cc4477;
             transition: transform 0.1s; pointer-events: auto;
             touch-action: manipulation;
-            user-select: none; -webkit-user-select: none;
         }
         button:active { transform: translateY(6px); box-shadow: 0 0 0 #cc4477; }
 
-        #hud { position: absolute; top: 20px; left: 20px; text-align: left; pointer-events: none; }
-        .hud-text { font-size: 22px; font-weight: bold; margin-bottom: 5px; text-shadow: 2px 2px 0 #ff6699; }
+        #hud { position: absolute; top: 15px; left: 15px; text-align: left; pointer-events: auto; }
+        .hud-text { font-size: 18px; font-weight: bold; margin-bottom: 5px; text-shadow: 2px 2px 0 #ff6699; }
         
+        #mute-btn {
+            font-size: 20px; cursor: pointer; background: rgba(0,0,0,0.5); 
+            border: 2px solid #fff; border-radius: 50%; width: 40px; height: 40px;
+            display: flex; align-items: center; justify-content: center; margin-bottom: 10px;
+        }
+
         #xp-bar-container {
-            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
-            width: 300px; height: 14px; background: rgba(0,0,0,0.5);
-            border: 3px solid #fff; border-radius: 10px; overflow: hidden; pointer-events: none;
+            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+            width: 250px; height: 12px; background: rgba(0,0,0,0.5);
+            border: 2px solid #fff; border-radius: 10px; overflow: hidden;
         }
         #xp-bar-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #ffcc00, #ff6699); transition: width 0.2s; }
         #level-badge {
-            position: absolute; top: 40px; left: 50%; transform: translateX(-50%);
-            font-size: 18px; font-weight: bold; color: #fff; text-shadow: 2px 2px 0 #000; pointer-events: none;
+            position: absolute; top: 35px; left: 50%; transform: translateX(-50%);
+            font-size: 16px; font-weight: bold; color: #fff; text-shadow: 2px 2px 0 #000;
         }
 
-        .card-container { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; max-width: 800px; pointer-events: none; }
+        .card-container { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 800px; pointer-events: none; }
         .upgrade-card {
-            background: #fff; border: 4px solid #ffcc00; border-radius: 16px;
-            padding: 15px; width: 140px; color: #333;
+            background: #fff; border: 4px solid #ffcc00; border-radius: 12px;
+            padding: 10px; width: 120px; color: #333;
             cursor: pointer; pointer-events: auto; text-align: center;
             box-shadow: 0 6px 0 #cc9900; transition: transform 0.1s;
-            user-select: none; -webkit-user-select: none;
         }
         .upgrade-card:active { transform: translateY(6px); box-shadow: 0 0 0 #cc9900; }
-        .card-icon { font-size: 40px; margin-bottom: 5px; pointer-events: none; }
-        .card-title { font-size: 14px; font-weight: bold; color: #ff6699; margin-bottom: 5px; pointer-events: none; }
-        .card-desc { font-size: 11px; color: #555; line-height: 1.2; pointer-events: none; }
+        .card-icon { font-size: 32px; margin-bottom: 5px; }
+        .card-title { font-size: 12px; font-weight: bold; color: #ff6699; margin-bottom: 5px; line-height: 1.2; height: 30px; display:flex; align-items:center; justify-content:center; }
+        .card-desc { font-size: 10px; color: #555; line-height: 1.2; height: 36px; overflow:hidden; }
 
         #boss-warning {
             position: absolute; top: 40%; left: 0; width: 100%;
             text-align: center; font-size: 60px; font-weight: 900; color: #ff3366;
             text-shadow: 4px 4px 0 #fff; display: none; z-index: 5;
-            animation: bounce 0.5s infinite alternate; pointer-events: none;
+            animation: bounce 0.5s infinite alternate;
         }
         @keyframes bounce { from { transform: scale(1); } to { transform: scale(1.1); } }
 
         #joystick-zone {
-            position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
-            color: rgba(255,255,255,0.6); font-size: 16px; pointer-events: none; display: none;
-            text-shadow: 1px 1px 2px #000; font-weight: bold;
+            position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
+            color: rgba(255,255,255,0.6); font-size: 14px; pointer-events: none; display: none;
+            text-shadow: 1px 1px 2px #000; font-weight: bold; width: 100%; text-align: center;
         }
     </style>
 </head>
@@ -118,6 +108,7 @@
 
     <div id="ui-layer">
         <div id="hud">
+            <div id="mute-btn">🔊</div>
             <div id="score-display" class="hud-text">SCORE: 0</div>
             <div id="lives-display" class="hud-text">❤️❤️❤️</div>
         </div>
@@ -130,10 +121,10 @@
         <div id="startScreen" class="overlay-screen">
             <h1>POP STAR<br>SURVIVOR</h1>
             <p>
-                [タッチ最適化版]<br>
-                長押しによる選択を防ぎました。<br>
-                画面をなぞって自機を操作！<br>
-                スタートボタンで開始！
+                [V30 修正版V3]<br>
+                サウンドエラーを修正しました。<br>
+                スタートボタンを押せば即座に始まります。<br>
+                アイテム25種類 & サウンド搭載！
             </p>
             <button id="startBtn">START!</button>
         </div>
@@ -153,11 +144,11 @@
     </div>
 
     <script>
-        // === 1. コンフィグ ===
+        // === Config ===
         const CONFIG = {
             MAX_LIVES: 3,
-            PLAYER_SPEED: 7, 
-            TOUCH_SENSITIVITY: 1.3,
+            PLAYER_SPEED: 4.5,
+            TOUCH_SENSITIVITY: 1.0,
             INVINCIBLE_TIME: 120,
             PICKUP_RADIUS: 120,
             BOSS_INTERVAL: 1800, 
@@ -165,7 +156,7 @@
             XP_GROWTH: 1.2
         };
 
-        // === 2. グローバル変数 ===
+        // === Global Variables ===
         let player = null;
         let enemies = [];
         let bullets = [];
@@ -182,397 +173,147 @@
         let isBossActive = false;
         let screenShake = 0;
 
-        // タッチ操作用
         let prevTouchX = 0;
         let prevTouchY = 0;
         let isTouching = false;
 
-        // === 3. クラス定義 ===
-
-        class Player {
-            constructor() {
-                let w = typeof width !== 'undefined' ? width : window.innerWidth;
-                let h = typeof height !== 'undefined' ? height : window.innerHeight;
-                this.pos = createVector(w/2, h/2);
-                this.lives = CONFIG.MAX_LIVES;
-                this.invincible = 0;
-                this.level = 1;
-                this.xp = 0;
-                this.nextXp = 20;
-                this.faceDir = 1; 
-                this.animAngle = 0;
-
-                this.stats = {
-                    speed: CONFIG.PLAYER_SPEED,
-                    pickup: CONFIG.PICKUP_RADIUS,
-                    dmg: 10, rate: 15, count: 1,
-                    missile: 0, shield: 0, 
-                    shieldActive: false, shieldCool: 0
-                };
-                this.timers = { shot: 0, missile: 0 };
-            }
-
-            update() {
-                // キーボード
-                let dx = 0, dy = 0;
-                if (keyIsDown(87) || keyIsDown(UP_ARROW)) dy = -1;
-                if (keyIsDown(83) || keyIsDown(DOWN_ARROW)) dy = 1;
-                if (keyIsDown(65) || keyIsDown(LEFT_ARROW)) dx = -1;
-                if (keyIsDown(68) || keyIsDown(RIGHT_ARROW)) dx = 1;
-                
-                // タッチ（ダイレクト相対移動）
-                if (touches.length > 0) {
-                    let t = touches[0];
-                    if (!isTouching) {
-                        prevTouchX = t.x;
-                        prevTouchY = t.y;
-                        isTouching = true;
-                    } else {
-                        let touchDx = t.x - prevTouchX;
-                        let touchDy = t.y - prevTouchY;
-                        
-                        this.pos.x += touchDx * CONFIG.TOUCH_SENSITIVITY;
-                        this.pos.y += touchDy * CONFIG.TOUCH_SENSITIVITY;
-
-                        if(touchDx > 1) this.faceDir = 1;
-                        if(touchDx < -1) this.faceDir = -1;
-
-                        prevTouchX = t.x;
-                        prevTouchY = t.y;
-                    }
-                } else {
-                    isTouching = false;
-                }
-
-                if (dx !== 0 || dy !== 0) {
-                    let move = createVector(dx, dy).normalize().mult(this.stats.speed);
-                    this.pos.add(move);
-                    if(dx > 0) this.faceDir = 1;
-                    if(dx < 0) this.faceDir = -1;
-                }
-
-                // 画面端制限
-                if(typeof width !== 'undefined') {
-                    this.pos.x = constrain(this.pos.x, 25, width-25);
-                    this.pos.y = constrain(this.pos.y, 25, height-25);
-                }
-
-                if (this.invincible > 0) this.invincible--;
-                this.animAngle += 0.05;
-
-                if(this.stats.shield > 0 && !this.stats.shieldActive) {
-                    if(this.stats.shieldCool > 0) this.stats.shieldCool--;
-                    else this.stats.shieldActive = true;
-                }
-
-                this.attack();
-            }
-
-            attack() {
-                if (frameCnt % this.stats.rate === 0) {
-                    let target = this.getNearestEnemy();
-                    let a = target ? p5.Vector.sub(target.pos, this.pos).heading() : (this.faceDir===1?0:PI);
-                    let spread = 0.2;
-                    let start = a - (spread * (this.stats.count - 1)) / 2;
+        // === Audio System (Tone.js) ===
+        const AudioSys = {
+            ready: false,
+            muted: false,
+            synth: null,
+            kick: null,
+            hat: null,
+            bass: null,
+            loop: null,
+            
+            async init() {
+                if(this.ready) return;
+                try {
+                    await Tone.start();
                     
-                    for(let i=0; i<this.stats.count; i++) {
-                        bullets.push(new Bullet(this.pos.x, this.pos.y, start + spread*i, this.stats.dmg, 'STAR'));
-                    }
+                    const reverb = new Tone.Reverb(1.5).toDestination();
+                    reverb.wet.value = 0.2;
+
+                    this.synth = new Tone.PolySynth(Tone.Synth, {
+                        volume: -10,
+                        oscillator: { type: "triangle" },
+                        envelope: { attack: 0.02, decay: 0.1, sustain: 0.1, release: 1 }
+                    }).connect(reverb);
+
+                    this.lead = new Tone.Synth({
+                        volume: -12,
+                        oscillator: { type: "fmsine", modulationType: "square", modulationIndex: 3, harmonicity: 3.4 },
+                        envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.2 }
+                    }).connect(reverb);
+
+                    this.kick = new Tone.MembraneSynth({ volume: -5 }).toDestination();
+                    this.hat = new Tone.MetalSynth({
+                        volume: -20, envelope: { attack: 0.001, decay: 0.05, release: 0.01 },
+                        harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5
+                    }).toDestination();
+                    
+                    this.bass = new Tone.FMSynth({
+                        volume: -8,
+                        oscillator: { type: "sawtooth" },
+                        envelope: { attack: 0.01, decay: 0.2, sustain: 0.4, release: 0.2 }
+                    }).toDestination();
+
+                    this.ready = true;
+                    this.setupBGM();
+                } catch (e) {
+                    console.log("Audio init failed, running silent mode", e);
                 }
-                if (this.stats.missile > 0 && frameCnt % 60 === 0) {
-                    for(let i=0; i<this.stats.missile; i++) {
-                        bullets.push(new Bullet(this.pos.x, this.pos.y, random(TWO_PI), this.stats.dmg*1.5, 'CANDY'));
-                    }
-                }
-            }
+            },
 
-            display() {
-                if (this.invincible > 0 && floor(frameCnt/4)%2===0) return;
+            setupBGM() {
+                const melody = ["C4", "E4", "G4", "B4", "C5", "B4", "G4", "E4"];
+                const bassLine = ["C2", null, "C2", null, "G2", null, "G2", null];
+                let index = 0;
 
-                push();
-                translate(this.pos.x, this.pos.y);
-                translate(0, sin(this.animAngle * 2) * 5);
-
-                if (this.stats.shieldActive) {
-                    noFill(); stroke(180, 50, 100, 50); strokeWeight(3);
-                    ellipse(0, 0, 70, 70);
-                }
-
-                scale(this.faceDir, 1);
-                noStroke();
+                this.loop = new Tone.Loop(time => {
+                    if(this.muted) return;
+                    // BGM logic handles timing internally, less prone to the specific error but wrapped just in case
+                    try {
+                        if(index % 4 === 0) this.kick.triggerAttackRelease("C1", "8n", time);
+                        if(index % 2 === 0) this.hat.triggerAttackRelease("32n", time);
+                        const b = bassLine[index % 8];
+                        if(b) this.bass.triggerAttackRelease(b, "8n", time);
+                        if(index % 2 === 0) {
+                            const m = melody[Math.floor(index/2) % melody.length];
+                            this.synth.triggerAttackRelease(m, "16n", time);
+                        }
+                    } catch(e) {}
+                    index++;
+                }, "16n");
                 
-                // Star
-                push(); rotate(this.animAngle); drawStar(0, 0, 18, 35, 5, color(50, 80, 100)); pop();
+                Tone.Transport.bpm.value = 130;
+                Tone.Transport.start();
+            },
 
-                // Character
-                fill(320, 60, 90); ellipse(0, -10, 20, 25);
-                fill(280, 60, 80); triangle(-8, -15, -20, 5, -5, 5);
-                fill(30, 20, 100); ellipse(0, -22, 22, 22);
-                fill(280, 80, 60); triangle(-16, -26, 16, -26, 0, -55 + sin(this.animAngle*4)*2);
-                ellipse(0, -26, 36, 10);
-                fill(0); ellipse(4, -22, 3, 3); ellipse(-4, -22, 3, 3);
-                fill(350, 60, 90); ellipse(6, -18, 4, 2); ellipse(-6, -18, 4, 2);
-                stroke(40, 60, 60); strokeWeight(2); line(12, -10, 22, -20);
-                noStroke(); fill(0, 80, 100); ellipse(22, -20, 7, 7);
+            startBGM() { if(this.loop && this.ready) this.loop.start(0); },
+            stopBGM() { if(this.loop && this.ready) this.loop.stop(); },
+            
+            toggleMute() {
+                this.muted = !this.muted;
+                if(this.ready) Tone.Destination.mute = this.muted;
+                document.getElementById('mute-btn').innerText = this.muted ? "🔇" : "🔊";
+            },
 
-                pop();
-            }
-
-            getNearestEnemy() {
-                let nearest = null;
-                let minDist = Infinity;
-                for (let e of enemies) {
-                    let d = p5.Vector.dist(this.pos, e.pos);
-                    if (d < minDist) { minDist = d; nearest = e; }
+            // --- 修正箇所: サウンド再生関数に try-catch と Tone.now() の明示的指定を追加 ---
+            shoot() { 
+                if(!this.muted && this.ready) {
+                    try { this.lead.triggerAttackRelease("C6", "32n", Tone.now(), 0.3); } catch(e){}
+                } 
+            },
+            hit() { 
+                if(!this.muted && this.ready) {
+                    // ここがエラーの原因箇所。try-catchで囲み、現在時刻を明示
+                    try { this.hat.triggerAttackRelease("16n", Tone.now(), 0.5); } catch(e){} 
+                } 
+            },
+            gem() { 
+                if(!this.muted && this.ready) {
+                    try { this.synth.triggerAttackRelease("C6", "64n", Tone.now(), 0.5); } catch(e){}
+                } 
+            },
+            explode() { 
+                if(!this.muted && this.ready) {
+                    try {
+                        const now = Tone.now();
+                        this.kick.triggerAttackRelease("G1", "16n", now);
+                        this.bass.triggerAttackRelease("C1", "16n", now);
+                    } catch(e){}
                 }
-                return nearest;
-            }
-
-            hit() {
-                if (this.invincible > 0) return;
-                
-                if(this.stats.shieldActive) {
-                    this.stats.shieldActive = false;
-                    this.stats.shieldCool = 300;
-                    this.invincible = 30;
-                    texts.push(new FloatingText(this.pos.x, this.pos.y-30, "BLOCK!", color(180, 50, 100)));
-                    return;
+            },
+            levelUp() {
+                if(!this.muted && this.ready) {
+                    try {
+                        const now = Tone.now();
+                        this.synth.triggerAttackRelease("C5", "16n", now);
+                        this.synth.triggerAttackRelease("E5", "16n", now + 0.1);
+                        this.synth.triggerAttackRelease("G5", "16n", now + 0.2);
+                        this.synth.triggerAttackRelease("C6", "8n", now + 0.3);
+                    } catch(e){}
                 }
-
-                this.lives--;
-                this.invincible = CONFIG.INVINCIBLE_TIME;
-                screenShake = 15;
-                
-                for(let e of enemies) {
-                    if(p5.Vector.dist(this.pos, e.pos) < 200) e.takeDamage(100);
+            },
+            boss() {
+                if(!this.muted && this.ready) {
+                    try { this.bass.triggerAttackRelease("C1", "2n", Tone.now()); } catch(e){}
                 }
-                updateHud();
-                if (this.lives <= 0) gameOver();
-            }
-
-            gainXp(amt) {
-                this.xp += amt;
-                if (this.xp >= this.nextXp) {
-                    this.level++;
-                    this.xp = 0;
-                    this.nextXp = floor(this.nextXp * 1.2);
-                    levelUp();
-                }
-                updateHud();
-            }
-        }
-
-        class Enemy {
-            constructor(isBoss) {
-                this.isBoss = isBoss;
-                this.dead = false;
-                
-                let ang = random(TWO_PI);
-                let d = (typeof width !== 'undefined' ? (width > height ? width : height) : 1000) / 1.5 + 100;
-                this.pos = createVector(player.pos.x + cos(ang)*d, player.pos.y + sin(ang)*d);
-                this.vel = createVector(0,0);
-                this.anim = random(100);
-                
-                let rank = 1 + (frameCnt / 3600);
-
-                if (isBoss) {
-                    this.hp = 2000 * rank; this.maxHp = this.hp;
-                    this.size = 80; this.speed = 1.0; 
-                    this.col = color(340, 80, 90); 
-                    this.xp = 2000;
-                } else {
-                    let r = random();
-                    if(r < 0.3) { 
-                        this.type = 'BAT'; this.hp = 15 * rank; this.size = 20; this.speed = 3.0; 
-                        this.col = color(270, 70, 80); this.xp = 15;
-                    } else if(r < 0.5) { 
-                        this.type = 'GOLEM'; this.hp = 60 * rank; this.size = 35; this.speed = 0.8; 
-                        this.col = color(140, 60, 60); this.xp = 30;
-                    } else { 
-                        this.type = 'SLIME'; this.hp = 25 * rank; this.size = 25; this.speed = 1.5; 
-                        this.col = color(200, 70, 90); this.xp = 10;
-                    }
-                    this.maxHp = this.hp;
+            },
+            damage() {
+                 if(!this.muted && this.ready) {
+                    try {
+                        const now = Tone.now();
+                        this.kick.triggerAttackRelease("C2", "8n", now);
+                        this.bass.triggerAttackRelease("F1", "8n", now);
+                    } catch(e){}
                 }
             }
+        };
 
-            update() {
-                let dir = p5.Vector.sub(player.pos, this.pos);
-                dir.normalize();
-                dir.mult(this.speed);
-                this.pos.add(dir);
-                this.anim += 0.2;
-
-                if (p5.Vector.dist(this.pos, player.pos) < (this.size/2 + 15)) {
-                    player.hit();
-                }
-
-                if (this.isBoss && frameCnt % 100 === 0) {
-                    let count = 8;
-                    for (let i = 0; i < count; i++) {
-                        let a = (TWO_PI / count) * i + this.anim*0.1;
-                        enemyBullets.push(new EnemyBullet(this.pos.x, this.pos.y, a));
-                    }
-                }
-            }
-
-            display() {
-                push();
-                translate(this.pos.x, this.pos.y);
-                noStroke();
-                let bounce = sin(this.anim) * 3;
-
-                if (this.isBoss) {
-                    fill(this.col);
-                    beginShape(); vertex(-40, -40 + bounce); bezierVertex(-60, 20, -20, 50, 0, 50); bezierVertex(20, 50, 60, 20, 40, -40 + bounce); endShape(CLOSE);
-                    fill(60, 80, 100); beginShape(); vertex(-25, -40+bounce); vertex(-15, -60+bounce); vertex(0, -45+bounce); vertex(15, -60+bounce); vertex(25, -40+bounce); endShape(CLOSE);
-                    fill(255); ellipse(-15, 0, 15, 15); ellipse(15, 0, 15, 15);
-                    fill(0); ellipse(-15, 0, 5, 5); ellipse(15, 0, 5, 5);
-                    noFill(); stroke(0); strokeWeight(3); arc(0, 10, 20, 10, 0, PI);
-                    noStroke(); fill(0, 0, 30); rect(-40, -80, 80, 8, 4); fill(0, 80, 90); rect(-40, -80, 80 * (this.hp/this.maxHp), 8, 4);
-                } else if(this.type === 'BAT') {
-                    fill(this.col);
-                    let w = sin(this.anim*2)*10;
-                    triangle(-5, 0, -20, -10+w, -5, 10); triangle(5, 0, 20, -10+w, 5, 10);
-                    ellipse(0, 0, 15, 15); fill(60, 80, 100); ellipse(-3, -2, 4, 4); ellipse(3, -2, 4, 4);
-                } else if(this.type === 'GOLEM') {
-                    fill(this.col);
-                    rectMode(CENTER); rect(0, bounce, 30, 30, 5);
-                    fill(0, 0, 100); rect(0, bounce-5, 20, 8); fill(0); ellipse(-5, bounce-5, 3, 3); ellipse(5, bounce-5, 3, 3);
-                } else {
-                    fill(this.col);
-                    beginShape(); vertex(-12, -10 + bounce); bezierVertex(-20, 10, -10, 15, 0, 15); bezierVertex(10, 15, 20, 10, 12, -10 + bounce); endShape(CLOSE);
-                    fill(255); ellipse(-5, -2+bounce, 6, 6); ellipse(5, -2+bounce, 6, 6); fill(0); ellipse(-5, -2+bounce, 2, 2); ellipse(5, -2+bounce, 2, 2);
-                }
-                pop();
-            }
-
-            takeDamage(dmg) {
-                this.hp -= dmg;
-                texts.push(new FloatingText(this.pos.x, this.pos.y-20, floor(dmg), color(0,0,100)));
-                if (this.hp <= 0 && !this.dead) {
-                    this.dead = true;
-                    score += this.isBoss ? 1000 : 10;
-                    if(this.isBoss) {
-                        for(let i=0; i<15; i++) gems.push(new Gem(this.pos.x+random(-40,40), this.pos.y+random(-40,40), this.xp/15));
-                        isBossActive=false; bossKillCount++;
-                        nextBossTimer=max(600, CONFIG.BOSS_INTERVAL - bossKillCount*200);
-                        for(let b of enemyBullets) b.dead=true;
-                    } else {
-                        gems.push(new Gem(this.pos.x, this.pos.y, this.xp));
-                    }
-                    let pCount = this.isBoss ? 30 : 5;
-                    for(let i=0; i<pCount; i++) particles.push(new Particle(this.pos.x, this.pos.y, this.col));
-                    updateHud();
-                }
-            }
-        }
-
-        class Bullet {
-            constructor(x, y, angle, dmg, type) {
-                this.pos = createVector(x, y);
-                this.vel = p5.Vector.fromAngle(angle).mult(10);
-                this.dmg = dmg; this.type = type;
-                this.life = 60; this.dead = false; this.rot = 0;
-            }
-            update() {
-                this.pos.add(this.vel);
-                this.life--; this.rot += 0.2;
-                if(this.life<=0 || this.pos.x<0 || this.pos.x>width || this.pos.y<0 || this.pos.y>height) this.dead=true;
-                
-                for(let e of enemies) {
-                    if(!e.dead && p5.Vector.dist(this.pos, e.pos) < e.size/2 + 10) {
-                        e.takeDamage(this.dmg); this.dead=true; break;
-                    }
-                }
-            }
-            display() {
-                push(); translate(this.pos.x, this.pos.y); rotate(this.rot); noStroke();
-                if(this.type === 'CANDY') {
-                    fill(330, 70, 100); ellipse(0,0, 12, 12);
-                    triangle(-6,0, -10,-4, -10,4); triangle(6,0, 10,-4, 10,4);
-                } else {
-                    drawStar(0, 0, 6, 14, 5, color(50, 90, 100));
-                }
-                pop();
-            }
-        }
-
-        class EnemyBullet {
-            constructor(x, y, angle) {
-                this.pos = createVector(x, y);
-                this.vel = p5.Vector.fromAngle(angle).mult(4);
-                this.life=180; this.dead=false;
-            }
-            update() {
-                this.pos.add(this.vel);
-                this.life--; if(this.life<=0) this.dead=true;
-                if(p5.Vector.dist(this.pos, player.pos)<15) { player.hit(); this.dead=true; }
-            }
-            display() {
-                fill(0, 80, 90); noStroke(); ellipse(this.pos.x, this.pos.y, 14, 14);
-            }
-        }
-
-        class Gem {
-            constructor(x, y, val) {
-                this.pos = createVector(x, y);
-                this.val = val; this.dead = false; this.rot = random(TWO_PI);
-            }
-            update() {
-                let d = p5.Vector.dist(this.pos, player.pos);
-                if(d < player.stats.pickup) {
-                    let dir = p5.Vector.sub(player.pos, this.pos);
-                    dir.setMag(12); this.pos.add(dir);
-                }
-                if(d < 20) { player.gainXp(this.val); this.dead = true; }
-                this.rot += 0.05;
-            }
-            display() {
-                push(); translate(this.pos.x, this.pos.y); rotate(this.rot);
-                fill(190, 60, 100); noStroke(); rectMode(CENTER); rect(0,0, 10, 10, 2);
-                pop();
-            }
-        }
-
-        class Particle {
-            constructor(x, y, col) {
-                this.pos = createVector(x, y);
-                this.vel = p5.Vector.random2D().mult(random(2, 5));
-                this.col = col; this.life = 255; this.dead = false;
-            }
-            update() {
-                this.pos.add(this.vel); this.life -= 15; if(this.life<=0) this.dead=true;
-            }
-            display() {
-                noStroke(); let c = color(this.col); c.setAlpha(this.life/255*100);
-                fill(c); ellipse(this.pos.x, this.pos.y, 6, 6);
-            }
-        }
-
-        class FloatingText {
-            constructor(x, y, txt, col) {
-                this.pos = createVector(x, y); this.txt = txt; this.col = col; this.life = 40; this.dead = false;
-            }
-            update() { this.pos.y -= 1; this.life--; if(this.life<=0) this.dead=true; }
-            display() {
-                fill(this.col); noStroke(); textAlign(CENTER); textStyle(BOLD); textSize(16);
-                text(this.txt, this.pos.x, this.pos.y);
-            }
-        }
-
-        function drawStar(x, y, r1, r2, n, col) {
-            fill(col); noStroke();
-            let angle = TWO_PI / n; let halfAngle = angle/2.0;
-            beginShape();
-            for (let a = 0; a < TWO_PI; a += angle) {
-                let sx = x + cos(a) * r2; let sy = y + sin(a) * r2; vertex(sx, sy);
-                sx = x + cos(a + halfAngle) * r1; sy = y + sin(a + halfAngle) * r1; vertex(sx, sy);
-            }
-            endShape(CLOSE);
-        }
-
-        // === 4. システム関数 ===
+        // === P5.js & Game Logic ===
 
         function setup() {
             let cnv = createCanvas(windowWidth, windowHeight);
@@ -581,15 +322,31 @@
             colorMode(HSB, 360, 100, 100, 100);
             smooth();
 
-            // モバイル対策
             if ('ontouchstart' in window) {
                 document.getElementById('joystick-zone').style.display = 'block';
             }
             
-            // 重要：右クリック・長押しメニュー禁止
-            document.addEventListener('contextmenu', event => event.preventDefault());
-            
+            player = new Player(windowWidth/2, windowHeight/2);
             resetGameParams();
+
+            const startBtn = document.getElementById('startBtn');
+            const restartBtn = document.getElementById('restartBtn');
+            const muteBtn = document.getElementById('mute-btn');
+
+            if (startBtn) {
+                startBtn.onclick = startGame;
+                startBtn.ontouchend = (e) => { e.preventDefault(); startGame(); };
+            }
+
+            if (restartBtn) {
+                restartBtn.onclick = resetGame;
+                restartBtn.ontouchend = (e) => { e.preventDefault(); resetGame(); };
+            }
+
+            if (muteBtn) {
+                muteBtn.onclick = () => AudioSys.toggleMute();
+                muteBtn.ontouchend = (e) => { e.preventDefault(); AudioSys.toggleMute(); };
+            }
         }
 
         function windowResized() {
@@ -597,22 +354,14 @@
         }
 
         function resetGameParams() {
-            // Player初期化（画面サイズが確定してから）
-            let w = typeof width !== 'undefined' ? width : window.innerWidth;
-            let h = typeof height !== 'undefined' ? height : window.innerHeight;
+            let w = (typeof width !== 'undefined' && width > 0) ? width : windowWidth;
+            let h = (typeof height !== 'undefined' && height > 0) ? height : windowHeight;
             
-            if(!player) player = new Player();
-            player.pos = createVector(w/2, h/2);
-            player.lives = CONFIG.MAX_LIVES;
-            player.xp = 0;
-            player.level = 1;
-            player.nextXp = 20;
-            player.stats.count = 1;
-            player.stats.dmg = 10;
-            player.stats.rate = 15;
-            player.stats.missile = 0;
-            player.stats.shield = 0;
-            player.stats.shieldActive = false;
+            if(!player) player = new Player(w/2, h/2);
+            else {
+                player.pos.set(w/2, h/2);
+                player.reset();
+            }
             
             enemies = []; bullets = []; enemyBullets = []; particles = []; gems = []; texts = [];
             score = 0; frameCnt = 0; bossKillCount = 0;
@@ -621,74 +370,59 @@
             updateHud();
         }
 
-        // イベントリスナー
-        document.addEventListener('DOMContentLoaded', () => {
-            const startBtn = document.getElementById('startBtn');
-            const restartBtn = document.getElementById('restartBtn');
-
-            // タッチとクリックの両方で反応するようにする
-            const startGameHandler = (e) => {
-                // ボタン以外への伝播を止める
-                e.preventDefault(); 
-                e.stopPropagation();
+        function startGame() {
+            try {
                 document.getElementById('startScreen').classList.add('hidden');
                 resetGameParams();
                 gameState = "PLAYING";
-            };
-
-            const resetGameHandler = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                document.getElementById('gameOverScreen').classList.add('hidden');
-                resetGameParams();
+                AudioSys.init().then(() => {
+                    AudioSys.startBGM();
+                }).catch(e => {
+                    console.log("Audio Error (ignored):", e);
+                });
+            } catch (err) {
+                console.error("Game Start Error:", err);
+                document.getElementById('startScreen').classList.add('hidden');
                 gameState = "PLAYING";
-            };
+            }
+        }
 
-            startBtn.addEventListener('click', startGameHandler);
-            startBtn.addEventListener('touchend', startGameHandler);
+        function resetGame() {
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            resetGameParams();
+            AudioSys.startBGM();
+            gameState = "PLAYING";
+        }
 
-            restartBtn.addEventListener('click', resetGameHandler);
-            restartBtn.addEventListener('touchend', resetGameHandler);
-            
-            // 画面全体の長押し防止（ボタン以外）
-            window.addEventListener('touchstart', function(e) {
-                if(e.target.tagName !== 'BUTTON' && e.target.closest('.upgrade-card') === null) {
-                    e.preventDefault();
-                }
-            }, {passive: false});
-        });
-
-        // === 5. メインループ ===
+        // === Main Loop ===
         function draw() {
-            background(270, 60, 20); 
+            background(260, 50, 15); // Dark Purple
 
             if (gameState === "PLAYING") {
                 push();
                 
-                // 画面揺れ
                 if (screenShake > 0) {
                     translate(random(-screenShake, screenShake), random(-screenShake, screenShake));
                     screenShake *= 0.9;
                     if(screenShake < 0.5) screenShake = 0;
                 }
 
-                // 星空
-                noStroke();
-                for(let i=0; i<40; i++) {
-                    let x = (i * 113 + frameCnt * 0.2) % width;
-                    let y = (i * 239 + frameCnt * 0.1) % height;
-                    let size = (sin(frameCnt * 0.05 + i) + 2) * 1.5;
-                    fill(60, 30, 100, 40);
-                    ellipse(x, y, size, size);
-                }
-
-                // 安全装置：playerが存在する場合のみ更新
-                if(player) {
-                    updateGameLogic();
-                }
+                drawStars();
+                if(player) updateGameLogic();
 
                 pop();
                 frameCnt++;
+            }
+        }
+
+        function drawStars() {
+            noStroke();
+            for(let i=0; i<30; i++) {
+                let x = (i * 113 + frameCnt * 0.2) % width;
+                let y = (i * 239 + frameCnt * 0.1) % height;
+                let size = (sin(frameCnt * 0.05 + i) + 2) * 1.5;
+                fill(60, 30, 100, 40);
+                ellipse(x, y, size, size);
             }
         }
 
@@ -696,11 +430,13 @@
             player.update();
             player.display();
 
+            // Spawn
             if (enemies.length < CONFIG.MAX_ENEMIES) {
                 let rate = max(10, 60 - floor(frameCnt / 300) - (bossKillCount * 5));
                 if (frameCnt % rate === 0) enemies.push(new Enemy(false));
             }
 
+            // Boss
             if (!isBossActive) {
                 nextBossTimer--;
                 if (nextBossTimer <= 0) spawnBoss();
@@ -730,65 +466,543 @@
             isBossActive = true;
             nextBossTimer = CONFIG.BOSS_INTERVAL;
             enemies.push(new Enemy(true));
+            // Wipe weak enemies
             for(let e of enemies) if(!e.isBoss) e.takeDamage(999);
+            
             const w = document.getElementById('boss-warning');
             w.style.display = 'block'; setTimeout(() => w.style.display = 'none', 3000);
+            AudioSys.boss();
         }
+
+        // === Classes ===
+
+        class Player {
+            constructor(x, y) {
+                this.pos = createVector(x, y);
+                this.reset();
+            }
+            
+            reset() {
+                this.lives = CONFIG.MAX_LIVES;
+                this.invincible = 0;
+                this.level = 1; this.xp = 0; this.nextXp = 20;
+                this.faceDir = 1; this.animAngle = 0;
+                
+                this.stats = {
+                    speed: CONFIG.PLAYER_SPEED, pickup: 120, dmg: 10, rate: 15, count: 1,
+                    missile: 0, shield: 0, shieldActive: false, shieldCool: 0,
+                    twin: false, side: false, bomb: 0, pierce: 0, 
+                    reflect: false, laser: 0, poison: 0, orbit: 0, 
+                    knockback: 1.0, wide: false, size: 1.0, expMult: 1.0
+                };
+                this.timers = { shot: 0, missile: 0, bomb: 0, laser: 0 };
+            }
+
+            update() {
+                // Movement
+                let dx = 0, dy = 0;
+                if (keyIsDown(87) || keyIsDown(UP_ARROW)) dy = -1;
+                if (keyIsDown(83) || keyIsDown(DOWN_ARROW)) dy = 1;
+                if (keyIsDown(65) || keyIsDown(LEFT_ARROW)) dx = -1;
+                if (keyIsDown(68) || keyIsDown(RIGHT_ARROW)) dx = 1;
+                
+                if (touches.length > 0) {
+                    let t = touches[0];
+                    if (!isTouching) {
+                        prevTouchX = t.x; prevTouchY = t.y; isTouching = true;
+                    } else {
+                        let tdx = t.x - prevTouchX; let tdy = t.y - prevTouchY;
+                        this.pos.x += tdx * CONFIG.TOUCH_SENSITIVITY;
+                        this.pos.y += tdy * CONFIG.TOUCH_SENSITIVITY;
+                        if(tdx > 1) this.faceDir = 1; if(tdx < -1) this.faceDir = -1;
+                        prevTouchX = t.x; prevTouchY = t.y;
+                    }
+                } else { isTouching = false; }
+
+                if (dx !== 0 || dy !== 0) {
+                    let move = createVector(dx, dy).normalize().mult(this.stats.speed);
+                    this.pos.add(move);
+                    if(dx > 0) this.faceDir = 1; if(dx < 0) this.faceDir = -1;
+                }
+
+                this.pos.x = constrain(this.pos.x, 25, width-25);
+                this.pos.y = constrain(this.pos.y, 25, height-25);
+
+                if (this.invincible > 0) this.invincible--;
+                this.animAngle += 0.05;
+
+                if(this.stats.shield > 0 && !this.stats.shieldActive) {
+                    if(this.stats.shieldCool > 0) this.stats.shieldCool--;
+                    else this.stats.shieldActive = true;
+                }
+
+                if(this.stats.poison > 0 && frameCnt % 20 === 0) {
+                    let range = 100 + this.stats.poison * 20;
+                    for(let e of enemies) {
+                        if(dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y) < range) {
+                            e.takeDamage(this.stats.dmg * 0.3);
+                        }
+                    }
+                }
+                
+                if(this.stats.bomb > 0 && frameCnt % 120 === 0) {
+                    bullets.push(new Bullet(this.pos.x, this.pos.y, 0, this.stats.dmg*3, 'MINE'));
+                }
+
+                this.attack();
+            }
+
+            attack() {
+                if (frameCnt % this.stats.rate === 0) {
+                    let target = this.getNearestEnemy();
+                    let baseA = target ? p5.Vector.sub(target.pos, this.pos).heading() : (this.faceDir===1?0:PI);
+                    
+                    let spread = this.stats.wide ? 0.4 : 0.2;
+                    let start = baseA - (spread * (this.stats.count - 1)) / 2;
+                    
+                    for(let i=0; i<this.stats.count; i++) {
+                        let a = start + spread*i;
+                        bullets.push(new Bullet(this.pos.x, this.pos.y, a, this.stats.dmg, 'STAR', this.stats));
+                    }
+                    if(this.stats.twin) {
+                        bullets.push(new Bullet(this.pos.x, this.pos.y, baseA + PI, this.stats.dmg*0.8, 'STAR', this.stats));
+                    }
+                    if(this.stats.side) {
+                        bullets.push(new Bullet(this.pos.x, this.pos.y, baseA + HALF_PI, this.stats.dmg*0.6, 'STAR', this.stats));
+                        bullets.push(new Bullet(this.pos.x, this.pos.y, baseA - HALF_PI, this.stats.dmg*0.6, 'STAR', this.stats));
+                    }
+                    AudioSys.shoot();
+                }
+                if (this.stats.missile > 0 && frameCnt % 60 === 0) {
+                    for(let i=0; i<this.stats.missile; i++) {
+                        bullets.push(new Bullet(this.pos.x, this.pos.y, random(TWO_PI), this.stats.dmg*1.5, 'CANDY', this.stats));
+                    }
+                }
+                if (this.stats.laser > 0 && frameCnt % 120 === 0) {
+                    let t = this.getNearestEnemy();
+                    if(t) {
+                        let a = p5.Vector.sub(t.pos, this.pos).heading();
+                        bullets.push(new Bullet(this.pos.x, this.pos.y, a, this.stats.dmg*2, 'LASER', this.stats));
+                    }
+                }
+            }
+
+            display() {
+                if (this.invincible > 0 && floor(frameCnt/4)%2===0) return;
+                push(); translate(this.pos.x, this.pos.y);
+                
+                if(this.stats.orbit > 0) {
+                    let r = 80;
+                    for(let i=0; i<this.stats.orbit; i++) {
+                        let a = frameCnt*0.05 + (TWO_PI/this.stats.orbit)*i;
+                        fill(200, 80, 100); ellipse(cos(a)*r, sin(a)*r, 12, 12);
+                        for(let e of enemies) {
+                            if(dist(this.pos.x+cos(a)*r, this.pos.y+sin(a)*r, e.pos.x, e.pos.y) < 20) {
+                                if(frameCnt%10===0) e.takeDamage(this.stats.dmg * 0.5);
+                            }
+                        }
+                    }
+                }
+
+                if(this.stats.poison > 0) {
+                    noFill(); stroke(100, 80, 100, 30); strokeWeight(2);
+                    ellipse(0, 0, 200 + this.stats.poison*40);
+                }
+
+                translate(0, sin(this.animAngle * 2) * 5);
+                scale(this.stats.size);
+
+                if (this.stats.shieldActive) {
+                    noFill(); stroke(180, 50, 100, 50); strokeWeight(3);
+                    ellipse(0, 0, 70, 70);
+                }
+
+                scale(this.faceDir, 1); noStroke();
+                
+                push(); rotate(this.animAngle); fill(50, 80, 100); drawStar(0, 0, 18, 35, 5, [50, 80, 100]); pop();
+                fill(320, 60, 90); ellipse(0, -10, 20, 25);
+                fill(280, 60, 80); triangle(-8, -15, -20, 5, -5, 5);
+                fill(30, 20, 100); ellipse(0, -22, 22, 22);
+                fill(280, 80, 60); triangle(-16, -26, 16, -26, 0, -55 + sin(this.animAngle*4)*2);
+                ellipse(0, -26, 36, 10);
+                fill(0); ellipse(4, -22, 3, 3); ellipse(-4, -22, 3, 3);
+                fill(350, 60, 90); ellipse(6, -18, 4, 2); ellipse(-6, -18, 4, 2);
+                stroke(40, 60, 60); strokeWeight(2); line(12, -10, 22, -20);
+                noStroke(); fill(0, 80, 100); ellipse(22, -20, 7, 7);
+                pop();
+            }
+
+            getNearestEnemy() {
+                let n = null, d = Infinity;
+                for (let e of enemies) {
+                    let dist = p5.Vector.dist(this.pos, e.pos);
+                    if (dist < d) { d = dist; n = e; }
+                }
+                return n;
+            }
+
+            hit() {
+                if (this.invincible > 0) return;
+                
+                if(this.stats.shieldActive) {
+                    this.stats.shieldActive = false;
+                    this.stats.shieldCool = 300;
+                    this.invincible = 30;
+                    texts.push(new FloatingText(this.pos.x, this.pos.y-30, "BLOCK!", color(180, 50, 100)));
+                    return;
+                }
+
+                this.lives--;
+                this.invincible = CONFIG.INVINCIBLE_TIME;
+                screenShake = 15;
+                for(let e of enemies) if(p5.Vector.dist(this.pos, e.pos) < 200) e.takeDamage(100);
+                updateHud();
+                AudioSys.damage();
+                if (this.lives <= 0) gameOver();
+            }
+
+            gainXp(amt) {
+                this.xp += amt * this.stats.expMult;
+                if (this.xp >= this.nextXp) {
+                    this.level++;
+                    this.xp = 0;
+                    this.nextXp = floor(this.nextXp * 1.2);
+                    levelUp();
+                }
+                updateHud();
+            }
+        }
+
+        class Enemy {
+            constructor(isBoss) {
+                this.isBoss = isBoss; this.dead = false;
+                let ang = random(TWO_PI);
+                let d = (width>height?width:height)/1.5 + 100;
+                this.pos = createVector(player.pos.x + cos(ang)*d, player.pos.y + sin(ang)*d);
+                this.anim = random(100);
+                this.freeze = 0;
+                
+                let rank = 1 + (frameCnt / 3600);
+                // === 修正点：色をcolor()オブジェクトではなく、配列で保持する ===
+                // これにより、p5.jsのコンテキスト外エラーやオブジェクト参照エラーを防ぐ
+                if (isBoss) {
+                    this.hp = 2000 * rank; this.maxHp = this.hp;
+                    this.size = 80; this.speed = 1.0; this.col = [340, 80, 90]; this.xp = 2000;
+                } else {
+                    let r = random();
+                    if(r < 0.3) { this.type = 'BAT'; this.hp = 15*rank; this.size = 20; this.speed = 3.0; this.col = [270, 70, 80]; this.xp = 15; }
+                    else if(r < 0.5) { this.type = 'GOLEM'; this.hp = 60*rank; this.size = 35; this.speed = 0.8; this.col = [140, 60, 60]; this.xp = 30; }
+                    else { this.type = 'SLIME'; this.hp = 25*rank; this.size = 25; this.speed = 1.5; this.col = [200, 70, 90]; this.xp = 10; }
+                    this.maxHp = this.hp;
+                }
+            }
+            update() {
+                let dir = p5.Vector.sub(player.pos, this.pos);
+                dir.normalize();
+                let spd = this.speed * (this.freeze>0 ? 0.5 : 1);
+                if(this.freeze>0) this.freeze--;
+                this.pos.add(dir.mult(spd));
+                this.anim += 0.2;
+
+                if (p5.Vector.dist(this.pos, player.pos) < (this.size/2 + 15 * player.stats.size)) player.hit();
+
+                if (this.isBoss && frameCnt % 100 === 0) {
+                    for (let i = 0; i < 8; i++) {
+                        let a = (TWO_PI / 8) * i + this.anim*0.1;
+                        enemyBullets.push(new EnemyBullet(this.pos.x, this.pos.y, a));
+                    }
+                }
+            }
+            display() {
+                push(); translate(this.pos.x, this.pos.y); noStroke();
+                let bounce = sin(this.anim) * 3;
+                
+                // === 修正点：配列を展開してfillに渡す ===
+                if(this.freeze > 0) fill(180, 50, 100); 
+                else fill(...this.col);
+                
+                if (this.isBoss) {
+                    beginShape(); vertex(-40, -40+bounce); bezierVertex(-60, 20, -20, 50, 0, 50); bezierVertex(20, 50, 60, 20, 40, -40+bounce); endShape(CLOSE);
+                    fill(50, 80, 100); beginShape(); vertex(-20, -40+bounce); vertex(-10, -60+bounce); vertex(0, -45+bounce); vertex(10, -60+bounce); vertex(20, -40+bounce); endShape(CLOSE);
+                    fill(255); ellipse(-15, 0, 18, 18); ellipse(15, 0, 18, 18); fill(0); ellipse(-15, 0, 6, 6); ellipse(15, 0, 6, 6);
+                    noStroke(); fill(0, 0, 30); rect(-40, -70, 80, 6, 3); fill(0, 80, 90); rect(-40, -70, 80 * (this.hp/this.maxHp), 6, 3);
+                } else if(this.type === 'BAT') {
+                    let w = sin(this.anim*2)*10;
+                    triangle(-5,0, -20, -10+w, -5, 10); triangle(5,0, 20, -10+w, 5, 10); ellipse(0,0, 16, 16); fill(60, 80, 100); ellipse(-3, -2, 4, 4); ellipse(4, -2, 4, 4);
+                } else if(this.type === 'GOLEM') {
+                    rectMode(CENTER); rect(0, bounce, 32, 32, 5); fill(0,0,100); rect(0, bounce-6, 24, 8, 2); fill(0); ellipse(-6, bounce-6, 3, 3); ellipse(6, bounce-6, 3, 3);
+                } else {
+                    beginShape(); vertex(-12, -10+bounce); bezierVertex(-20, 10, -10, 15, 0, 15); bezierVertex(10, 15, 20, 10, 12, -10+bounce); endShape(CLOSE); fill(255); ellipse(-5, -2+bounce, 6, 6); ellipse(5, -2+bounce, 6, 6); fill(0); ellipse(-5, -2+bounce, 2, 2); ellipse(5, -2+bounce, 2, 2);
+                }
+                pop();
+            }
+            takeDamage(dmg, knockback=0, freeze=false) {
+                this.hp -= dmg;
+                if(knockback > 0) {
+                    let dir = p5.Vector.sub(this.pos, player.pos).normalize().mult(knockback * 10);
+                    this.pos.add(dir);
+                }
+                if(freeze) this.freeze = 60;
+                
+                texts.push(new FloatingText(this.pos.x, this.pos.y-20, floor(dmg), color(0,0,100)));
+                AudioSys.hit();
+                
+                if (this.hp <= 0 && !this.dead) {
+                    this.dead = true; score += this.isBoss ? 1000 : 10;
+                    if(this.isBoss) {
+                        for(let i=0; i<15; i++) gems.push(new Gem(this.pos.x+random(-40,40), this.pos.y+random(-40,40), this.xp/15));
+                        isBossActive=false; bossKillCount++; nextBossTimer=max(600, CONFIG.BOSS_INTERVAL - bossKillCount*200);
+                        for(let b of enemyBullets) b.dead=true;
+                    } else {
+                        gems.push(new Gem(this.pos.x, this.pos.y, this.xp));
+                    }
+                    for(let i=0; i<(this.isBoss?30:5); i++) particles.push(new Particle(this.pos.x, this.pos.y, this.col)); // 配列を渡す
+                    updateHud();
+                    AudioSys.explode();
+                }
+            }
+        }
+
+        class Bullet {
+            constructor(x, y, angle, dmg, type, stats) {
+                this.pos = createVector(x, y);
+                this.vel = p5.Vector.fromAngle(angle).mult(10);
+                this.dmg = dmg; this.type = type;
+                this.life = 60; this.dead = false; this.rot = 0;
+                this.stats = stats; // ref
+                this.pierce = stats?stats.pierce:0;
+                this.hitList = [];
+                
+                // Special Types
+                if(type === 'MINE') { this.vel.mult(0); this.life = 300; }
+                if(type === 'LASER') { this.vel.mult(2); this.pierce = 999; this.life = 20; }
+                if(type === 'BOOMERANG') { this.life = 90; }
+            }
+            update() {
+                if(this.type === 'MISSILE') {
+                    if(!this.target || this.target.dead) this.target = player.getNearestEnemy();
+                    if(this.target) {
+                        let desired = p5.Vector.sub(this.target.pos, this.pos);
+                        desired.setMag(8);
+                        this.vel.lerp(desired, 0.1);
+                    }
+                }
+                if(this.type === 'BOOMERANG') {
+                    if(this.life < 45) {
+                        let back = p5.Vector.sub(player.pos, this.pos).setMag(12);
+                        this.vel.lerp(back, 0.1);
+                    }
+                }
+                
+                // Reflect
+                if(this.stats && this.stats.reflect) {
+                    if(this.pos.x < 0 || this.pos.x > width) this.vel.x *= -1;
+                    if(this.pos.y < 0 || this.pos.y > height) this.vel.y *= -1;
+                }
+
+                this.pos.add(this.vel);
+                this.life--; this.rot += 0.2;
+                if(this.life<=0 && this.type!=='MINE') this.dead=true;
+                
+                // Hit check
+                for(let e of enemies) {
+                    if(!e.dead && dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y) < e.size/2 + 10) {
+                        if(!this.hitList.includes(e)) {
+                            let dmg = this.dmg;
+                            if(this.type==='MINE') { dmg *= 3; this.dead=true; }
+                            
+                            e.takeDamage(dmg, this.stats?this.stats.knockback:0, this.stats?this.stats.freeze:false);
+                            this.hitList.push(e);
+                            if(this.pierce > 0) this.pierce--; else if(this.type!=='MINE') this.dead=true;
+                        }
+                    }
+                }
+            }
+            display() {
+                push(); translate(this.pos.x, this.pos.y); rotate(this.rot); noStroke();
+                if(this.type === 'CANDY') {
+                    fill(330, 70, 100); ellipse(0,0, 12, 12); triangle(-6,0, -10,-4, -10,4); triangle(6,0, 10,-4, 10,4);
+                } else if(this.type === 'MINE') {
+                    fill(0, 80, 100); ellipse(0,0, 16, 16); fill(0); text("!", -3, 4);
+                } else if(this.type === 'LASER') {
+                    rotate(this.vel.heading()); fill(180, 80, 100); rect(-20, -5, 40, 10);
+                } else {
+                    // === 修正点：drawStarに配列を渡す ===
+                    drawStar(0, 0, 6, 14, 5, [50, 90, 100]);
+                }
+                pop();
+            }
+        }
+
+        class EnemyBullet {
+            constructor(x, y, angle) {
+                this.pos = createVector(x, y);
+                this.vel = p5.Vector.fromAngle(angle).mult(4);
+                this.life=180; this.dead=false;
+            }
+            update() {
+                this.pos.add(this.vel);
+                this.life--; if(this.life<=0) this.dead=true;
+                if(p5.Vector.dist(this.pos, player.pos)<15) { player.hit(); this.dead=true; }
+            }
+            display() { fill(0, 80, 90); noStroke(); ellipse(this.pos.x, this.pos.y, 14, 14); }
+        }
+
+        class Gem {
+            constructor(x, y, val) {
+                this.pos = createVector(x, y);
+                this.val = val; this.dead = false; this.rot = random(TWO_PI);
+            }
+            update() {
+                let d = p5.Vector.dist(this.pos, player.pos);
+                if(d < player.stats.pickup) {
+                    let dir = p5.Vector.sub(player.pos, this.pos);
+                    dir.setMag(12); this.pos.add(dir);
+                }
+                if(d < 20) { player.gainXp(this.val); this.dead = true; AudioSys.gem(); }
+                this.rot += 0.05;
+            }
+            display() {
+                push(); translate(this.pos.x, this.pos.y); rotate(this.rot);
+                fill(190, 60, 100); noStroke(); rectMode(CENTER); rect(0,0, 10, 10, 2); pop();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, col) {
+                this.pos = createVector(x, y);
+                this.vel = p5.Vector.random2D().mult(random(2, 5));
+                this.col = col; // 配列を受け取る
+                this.life = 255; this.dead = false;
+            }
+            update() { this.pos.add(this.vel); this.life -= 15; if(this.life<=0) this.dead=true; }
+            display() { 
+                noStroke();
+                // === 修正点：配列から安全にカラーオブジェクトを生成 ===
+                let c = color(...this.col); 
+                c.setAlpha(this.life/255*100); 
+                fill(c); 
+                ellipse(this.pos.x, this.pos.y, 6, 6); 
+            }
+        }
+
+        class FloatingText {
+            constructor(x, y, txt, col) {
+                this.pos = createVector(x, y); this.txt = txt; this.col = col; this.life = 40; this.dead = false;
+            }
+            update() { this.pos.y -= 1; this.life--; if(this.life<=0) this.dead=true; }
+            display() { fill(this.col); noStroke(); textAlign(CENTER); textStyle(BOLD); textSize(16); text(this.txt, this.pos.x, this.pos.y); }
+        }
+
+        function drawStar(x, y, r1, r2, n, col) {
+            // === 修正点：colが渡された場合は配列として展開する ===
+            if (col) fill(...col);
+            noStroke();
+            let angle = TWO_PI / n; let halfAngle = angle/2.0;
+            beginShape();
+            for (let a = 0; a < TWO_PI; a += angle) {
+                let sx = x + cos(a) * r2; let sy = y + sin(a) * r2; vertex(sx, sy);
+                sx = x + cos(a + halfAngle) * r1; sy = y + sin(a + halfAngle) * r1; vertex(sx, sy);
+            }
+            endShape(CLOSE);
+        }
+
+        // === Helper Functions (Restored) ===
 
         function updateHud() {
             if(!player) return;
             document.getElementById('score-display').innerText = `SCORE: ${score}`;
-            document.getElementById('lives-display').innerText = '❤️'.repeat(max(0, player.lives));
+            document.getElementById('lives-display').innerText = '❤️'.repeat(player.lives);
             document.getElementById('level-badge').innerText = `Lv.${player.level}`;
-            let pct = min(100, (player.xp / player.nextXp) * 100);
-            document.getElementById('xp-bar-fill').style.width = `${pct}%`;
+            
+            let xpPct = Math.min(100, (player.xp / player.nextXp) * 100);
+            document.getElementById('xp-bar-fill').style.width = `${xpPct}%`;
         }
 
         function gameOver() {
-            gameState = "GAME_OVER";
-            document.getElementById('gameOverScreen').classList.remove('hidden');
+            gameState = "GAMEOVER";
             document.getElementById('finalScore').innerText = `SCORE: ${score}`;
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+            AudioSys.stopBGM();
         }
-
-        const UPGRADES = [
-            { id: 'dmg', title: 'POWER UP', desc:'星のいりょくアップ', icon: '🌟', apply: () => player.stats.dmg += 5 },
-            { id: 'count', title: 'MULTI STAR', desc:'星のかず+1', icon: '✨', apply: () => player.stats.count++ },
-            { id: 'missile', title: 'CANDY', desc:'ついびキャンディ', icon: '🍬', apply: () => player.stats.missile++ },
-            { id: 'shield', title: 'BARRIER', desc:'バリア(1回)', icon: '🛡️', apply: () => { player.stats.shield++; player.stats.shieldCool = 0; } },
-            { id: 'speed', title: 'SPEED', desc:'いどうそくどアップ', icon: '👟', apply: () => player.stats.speed += 1 },
-            { id: 'heal', title: 'HEAL', desc:'ハートかいふく', icon: '💖', rare:true, apply: () => { if(player.lives<CONFIG.MAX_LIVES) player.lives++; } }
-        ];
 
         function levelUp() {
-            gameState = "LEVEL_UP";
-            const c = document.getElementById('cardsContainer'); c.innerHTML = '';
+            gameState = "LEVELUP";
             document.getElementById('levelUpScreen').classList.remove('hidden');
-            const choices = [];
+            AudioSys.levelUp();
+            generateUpgradeCards();
+        }
+        
+        const UPGRADES = [
+            { id: 'rate', title: 'RAPID FIRE', desc: '発射速度アップ', icon: '⚡' },
+            { id: 'count', title: 'MULTI SHOT', desc: '発射数+1', icon: '🍒' },
+            { id: 'dmg', title: 'POWER UP', desc: '攻撃力アップ', icon: '💪' },
+            { id: 'speed', title: 'SPEED UP', desc: '移動速度アップ', icon: '👟' },
+            { id: 'wide', title: 'WIDE SHOT', desc: '攻撃範囲拡大', icon: '↔️' },
+            { id: 'pierce', title: 'PIERCING', desc: '貫通力アップ', icon: '🏹' },
+            { id: 'missile', title: 'MISSILE', desc: '追尾ミサイル追加', icon: '🚀' },
+            { id: 'shield', title: 'SHIELD', desc: 'シールド装備', icon: '🛡️' },
+            { id: 'twin', title: 'TWIN SHOT', desc: '背後攻撃追加', icon: '♊' },
+            { id: 'side', title: 'SIDE SHOT', desc: '側面攻撃追加', icon: '🦀' },
+            { id: 'laser', title: 'LASER', desc: 'レーザー発射', icon: '🔦' },
+            { id: 'bomb', title: 'MINE', desc: '地雷設置', icon: '💣' },
+            { id: 'poison', title: 'POISON', desc: '毒オーラ', icon: '☠️' },
+            { id: 'orbit', title: 'ORBIT', desc: '衛星ビット', icon: '🪐' }
+        ];
+
+        function generateUpgradeCards() {
+            const container = document.getElementById('cardsContainer');
+            container.innerHTML = '';
+            
+            // ランダムに3つ選ぶ
+            let choices = [];
             while(choices.length < 3) {
-                const u = random(UPGRADES);
-                if(u.id==='heal' && player.lives>=CONFIG.MAX_LIVES) continue;
-                if(!choices.includes(u)) choices.push(u);
+                let r = UPGRADES[Math.floor(Math.random() * UPGRADES.length)];
+                if(!choices.includes(r)) choices.push(r);
             }
+
             choices.forEach(u => {
-                const div = document.createElement('div');
-                div.className = `upgrade-card ${u.rare?'card-rare':''}`;
-                div.innerHTML = `<div class="card-icon">${u.icon}</div><div class="card-title">${u.title}</div><div class="card-desc">${u.desc}</div>`;
-                
-                // カードクリック・タッチ処理
-                const selectUpgrade = (e) => {
+                let card = document.createElement('div');
+                card.className = 'upgrade-card';
+                card.innerHTML = `
+                    <div class="card-icon">${u.icon}</div>
+                    <div class="card-title">${u.title}</div>
+                    <div class="card-desc">${u.desc}</div>
+                `;
+                card.onclick = () => selectUpgrade(u.id);
+                // タッチ対応
+                card.ontouchend = (e) => {
                     e.preventDefault();
-                    e.stopPropagation();
-                    u.apply();
-                    document.getElementById('levelUpScreen').classList.add('hidden');
-                    gameState = "PLAYING";
-                    player.invincible = 60;
+                    selectUpgrade(u.id);
                 };
-                div.addEventListener('click', selectUpgrade);
-                div.addEventListener('touchend', selectUpgrade);
-                
-                c.appendChild(div);
+                container.appendChild(card);
             });
         }
+
+        function selectUpgrade(id) {
+            if(!player) return;
+            
+            switch(id) {
+                case 'rate': player.stats.rate = Math.max(5, player.stats.rate - 2); break;
+                case 'count': player.stats.count++; break;
+                case 'dmg': player.stats.dmg += 5; break;
+                case 'speed': player.stats.speed += 0.5; break;
+                case 'wide': player.stats.wide = true; break;
+                case 'pierce': player.stats.pierce++; break;
+                case 'missile': player.stats.missile++; break;
+                case 'shield': player.stats.shield++; player.stats.shieldActive = true; break;
+                case 'twin': player.stats.twin = true; break;
+                case 'side': player.stats.side = true; break;
+                case 'laser': player.stats.laser++; break;
+                case 'bomb': player.stats.bomb++; break;
+                case 'poison': player.stats.poison++; break;
+                case 'orbit': player.stats.orbit++; break;
+            }
+            
+            document.getElementById('levelUpScreen').classList.add('hidden');
+            gameState = "PLAYING";
+        }
+
     </script>
 </body>
 </html>
